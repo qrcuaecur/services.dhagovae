@@ -47,7 +47,13 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
     password: parsed.data.password,
   });
 
-  if (error) return genericFailure;
+  if (error) {
+    // The visitor always gets the generic message, but the server log keeps
+    // the real reason: a rejected API key and a wrong password look identical
+    // on the form and need completely different fixes.
+    console.error("Sign-in failed", { status: error.status, code: error.code, message: error.message });
+    return genericFailure;
+  }
 
   loginRateLimiter.reset(throttleKey);
 

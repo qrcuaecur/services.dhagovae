@@ -203,7 +203,14 @@ function toPublicDocument(row: PublicRow): PublicDocument {
 export const getPublicDocument = cache(async (id: string): Promise<PublicDocumentResult> => {
   const supabase = createAdminClient();
 
-  const { data } = await supabase.from("documents").select(PUBLIC_COLUMNS).eq("id", id).maybeSingle();
+  const { data, error } = await supabase.from("documents").select(PUBLIC_COLUMNS).eq("id", id).maybeSingle();
+
+  // A failed query must not masquerade as "not found": a misconfigured key
+  // would otherwise make every document on the site look deleted.
+  if (error) {
+    console.error("Public document lookup failed", { id, code: error.code, message: error.message });
+    throw new Error("Document lookup failed.");
+  }
 
   const row = data as PublicRow | null;
 
@@ -239,11 +246,16 @@ export type DownloadTarget = {
 export async function getDownloadTarget(id: string): Promise<DownloadTarget | null> {
   const supabase = createAdminClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("documents")
     .select("id, file_path, file_name, file_type, status, expires_at, deleted_at")
     .eq("id", id)
     .maybeSingle();
+
+  if (error) {
+    console.error("Download lookup failed", { id, code: error.code, message: error.message });
+    throw new Error("Document lookup failed.");
+  }
 
   if (!data) return null;
 
