@@ -4,7 +4,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/session";
-import { DOCUMENTS_PER_PAGE, SIGNED_URL_TTL, previewKindFor } from "@/lib/constants";
+import { DOCUMENTS_PER_PAGE, SIGNED_URL_TTL } from "@/lib/constants";
 import { createSignedUrl } from "@/lib/documents/storage";
 import type { DocumentListParams } from "@/schemas/common";
 import type {
@@ -268,17 +268,17 @@ export async function getDownloadTarget(id: string): Promise<DownloadTarget | nu
 }
 
 /**
- * Signed URL for an inline preview. Longer-lived than the download link
- * because a viewer may sit reading it, but still short and single-purpose -
- * which is why passing this string to a Client Component is acceptable when
- * passing the raw storage path never would be.
+ * Short-lived signed URL that serves the file inline (no download
+ * disposition), for any file type. PDFs and images render directly in the
+ * browser; other formats download. The public page redirects the visitor
+ * straight here, so a QR scan shows only the file and none of the app's UI.
+ *
+ * Reuses getDownloadTarget's deleted / expiry / status checks, so an
+ * unavailable document never yields a URL.
  */
-export async function getPreviewUrl(id: string): Promise<string | null> {
+export async function getInlineFileUrl(id: string): Promise<string | null> {
   const target = await getDownloadTarget(id);
   if (!target) return null;
-
-  const kind = previewKindFor(target.fileType);
-  if (kind === "generic") return null;
 
   return createSignedUrl(target.filePath, SIGNED_URL_TTL.preview);
 }

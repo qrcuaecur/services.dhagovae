@@ -21,7 +21,9 @@ export default defineConfig({
   // the address the code encodes.
   webServer: {
     command: `npx next dev -p ${PORT}`,
-    url: BASE_URL,
+    // Poll a route that returns 200 - the site root is now a 404, which
+    // Playwright would read as "not ready".
+    url: `${BASE_URL}/admin/login`,
     reuseExistingServer: true,
     timeout: 120_000,
   },

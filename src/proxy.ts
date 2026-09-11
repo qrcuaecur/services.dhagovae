@@ -18,6 +18,14 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // Bare /admin is not a real page. Let it fall through to a 404 rather than
+  // redirecting to the login form, so the portal isn't advertised to anyone
+  // who guesses the path - only /admin/login itself shows the sign-in page.
+  if (pathname === "/admin" || pathname === "/admin/") {
+    return applyAuth(NextResponse.next({ request }));
+  }
+
   const isLoginRoute = pathname === "/admin/login";
 
   if (isLoginRoute) {

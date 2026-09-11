@@ -30,13 +30,15 @@ async function signIn(page: Page) {
 test.describe.configure({ mode: "serial" });
 
 test.describe("public surface stays separate from admin", () => {
-  test("landing page never mentions the admin portal", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  test("the site root shows nothing", async ({ request }) => {
+    const response = await request.get("/", { maxRedirects: 0 });
+    expect(response.status()).toBe(404);
+  });
 
-    const html = (await page.content()).toLowerCase();
-    expect(html).not.toContain("/admin");
-    expect(html).not.toContain("sign in");
+  test("bare /admin shows nothing, not the login form", async ({ request }) => {
+    const response = await request.get("/admin", { maxRedirects: 0 });
+    // A 404, not a redirect to /admin/login: the portal isn't advertised.
+    expect(response.status()).toBe(404);
   });
 
   test("robots.txt does not advertise the admin path", async ({ request }) => {
@@ -159,31 +161,24 @@ test.describe("upload", () => {
 });
 
 test.describe("public document page", () => {
-  test("shows the document to an anonymous visitor", async ({ page }) => {
-    await page.goto(`/document/${documentId}`);
+  test("a scanned document redirects straight to the inline file, no app chrome", async ({ page }) => {
+    const response = await page.request.get(`/document/${documentId}`, { maxRedirects: 0 });
 
-    await expect(page.getByRole("heading", { name: DOC_TITLE })).toBeVisible();
-    // Appears in both the header and the details list.
-    await expect(page.getByText(DOC_NUMBER).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /Download document/ })).toBeVisible();
+    // 307 straight to a storage-signed URL - not an app page of our own.
+    expect(response.status()).toBe(307);
+    const location = response.headers()["location"];
+    expect(location).toContain("token=");
+    expect(location).not.toContain(`/document/${documentId}`);
   });
 
-  test("is marked noindex", async ({ page }) => {
-    await page.goto(`/document/${documentId}`);
-    const robots = await page.locator('meta[name="robots"]').getAttribute("content");
-    expect(robots).toContain("noindex");
+  test("following the redirect returns the uploaded PDF itself", async ({ page }) => {
+    // maxRedirects default follows the 307 to the signed file.
+    const response = await page.request.get(`/document/${documentId}`);
+    expect(response.status()).toBe(200);
+    expect((await response.body()).subarray(0, 4).toString("latin1")).toBe("%PDF");
   });
 
-  test("never exposes the storage path to the browser", async ({ page }) => {
-    await page.goto(`/document/${documentId}`);
-    const html = await page.content();
-
-    expect(html).not.toContain("file_path");
-    expect(html).not.toContain("storage_bucket");
-    expect(html).not.toContain("service_role");
-  });
-
-  test("download redirects to a signed URL and returns the file", async ({ page }) => {
+  test("the download endpoint also returns the file via a signed URL", async ({ page }) => {
     const response = await page.request.get(`/api/public/documents/${documentId}/download`, {
       maxRedirects: 0,
     });
@@ -196,18 +191,6 @@ test.describe("public document page", () => {
     const file = await page.request.get(location);
     expect(file.status()).toBe(200);
     expect((await file.body()).subarray(0, 4).toString("latin1")).toBe("%PDF");
-  });
-
-  test("renders correctly on a phone-sized viewport with no horizontal scroll", async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 780 });
-    await page.goto(`/document/${documentId}`);
-
-    await expect(page.getByRole("link", { name: /Download document/ })).toBeVisible();
-
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
   });
 });
 
@@ -246,8 +229,10 @@ test.describe("lifecycle keeps QR codes resolvable", () => {
     await page.getByRole("button", { name: "Restore document" }).click();
     await expect(page.getByText("Document restored.")).toBeVisible();
 
-    await page.goto(`/document/${documentId}`);
-    await expect(page.getByRole("link", { name: /Download document/ })).toBeVisible();
+    // Available again: the public page redirects straight to the file.
+    const response = await page.request.get(`/document/${documentId}`, { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()["location"]).toContain("token=");
   });
 
   test("a past expiry date shows the expired notice", async ({ page }) => {
@@ -271,8 +256,10 @@ test.describe("lifecycle keeps QR codes resolvable", () => {
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByText("Changes saved.")).toBeVisible();
 
-    await page.goto(`/document/${documentId}`);
-    await expect(page.getByRole("link", { name: /Download document/ })).toBeVisible();
+    // Available again: the public page redirects straight to the file.
+    const response = await page.request.get(`/document/${documentId}`, { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()["location"]).toContain("token=");
   });
 
   test("deleting gives a controlled page, not a broken link", async ({ page }) => {

@@ -1,30 +1,18 @@
-import Link from "next/link";
-import { FileQuestionIcon } from "lucide-react";
-import { PublicShell } from "@/components/public/public-shell";
-import { Button } from "@/components/ui/button";
-
 /**
- * Deliberately generic: a deleted document and an id that never existed look
- * identical here, so the page can't be used to probe which ids are real.
+ * Shown when a scanned QR points at a document that never existed or was
+ * deleted. Deliberately generic and minimal - a deleted document is
+ * indistinguishable from one that never existed, so probing ids reveals
+ * nothing.
  */
 export default function DocumentNotFound() {
   return (
-    <PublicShell>
+    <main className="flex min-h-svh items-center justify-center px-4 py-12">
       <div className="text-center">
-        <div className="bg-muted text-muted-foreground mx-auto flex size-12 items-center justify-center rounded-full">
-          <FileQuestionIcon className="size-5" aria-hidden="true" />
-        </div>
-
-        <h1 className="mt-5 text-xl font-semibold tracking-tight text-balance">Document unavailable</h1>
-        <p className="text-muted-foreground mx-auto mt-2 max-w-sm text-sm text-balance">
-          This document may have been removed, archived, or the QR code may be invalid. Please contact the administrator
-          if you were expecting to find something here.
+        <h1 className="text-base font-medium">Document unavailable</h1>
+        <p className="text-muted-foreground mt-2 max-w-xs text-sm text-balance">
+          This document may have been removed, or the QR code may be invalid.
         </p>
-
-        <Button asChild variant="outline" className="mt-6">
-          <Link href="/">Go back</Link>
-        </Button>
       </div>
-    </PublicShell>
+    </main>
   );
 }
